@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=no">
     <title>InvoiceAI Pro | Progressive Multi-Engine Document Intelligence & OCR</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,7 +15,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom Modern Progressive Theme CSS -->
-    <link rel="stylesheet" href="/css/style.css?v=20">
+    <link rel="stylesheet" href="/css/style.css?v=25">
 </head>
 <body class="light-theme">
     <div class="app-layout">
@@ -101,8 +105,93 @@
                 <button class="btn btn-outline btn-sm" id="btnProcessNewDoc" style="display: none;">
                     <i class="fa-solid fa-plus"></i> New Scan
                 </button>
+                <button class="mobile-menu-btn" id="btnMobileMenuToggle" aria-label="Toggle Navigation Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
             </div>
         </header>
+
+        <!-- MOBILE STEP BAR (Visible only on mobile screens) -->
+        <div class="mobile-step-bar" id="mobileStepBar">
+            <div class="mobile-step-meta">
+                <span class="mobile-step-badge" id="mobileStepBadge">Step 1 of 4</span>
+                <span class="mobile-step-name" id="mobileStepName">Upload Ingestion</span>
+            </div>
+            <div class="mobile-step-progress-track">
+                <div class="mobile-step-progress-fill" id="mobileStepProgressFill" style="width: 25%;"></div>
+            </div>
+            <div class="mobile-step-dots">
+                <button class="step-dot active" data-step="1" title="Upload">1</button>
+                <button class="step-dot" data-step="2" title="Inspect">2</button>
+                <button class="step-dot" data-step="3" title="Sync">3</button>
+                <button class="step-dot" data-step="4" title="Results">4</button>
+            </div>
+        </div>
+
+        <!-- MOBILE NAVIGATION DRAWER & BACKDROP -->
+        <div class="mobile-drawer-overlay" id="mobileDrawerOverlay"></div>
+        <aside class="mobile-drawer" id="mobileDrawer">
+            <div class="drawer-header">
+                <div class="drawer-brand">
+                    <div class="brand-icon">
+                        <i class="fa-solid fa-sparkles"></i>
+                    </div>
+                    <div class="brand-info">
+                        <div class="brand-title-row">
+                            <span class="brand-name">InvoiceAI</span>
+                            <span class="brand-badge">NEURAL</span>
+                        </div>
+                        <span class="brand-sub">Multi-Engine OCR & Audit</span>
+                    </div>
+                </div>
+                <button class="icon-tool-btn" id="btnCloseMobileDrawer" aria-label="Close Menu">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="drawer-body">
+                <div class="drawer-status-chip">
+                    <span class="status-dot-pulse"></span>
+                    <span id="drawerEngineStatusText">EasyOCR Deep Learning Ready</span>
+                </div>
+                <div class="drawer-nav-actions">
+                    <button class="drawer-nav-item" id="btnDrawerSample">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo"></i>
+                        <div class="nav-item-text">
+                            <strong>Instant Demo</strong>
+                            <span>Try enterprise sample with GSTIN & ledger</span>
+                        </div>
+                    </button>
+                    <button class="drawer-nav-item" id="btnDrawerCamera">
+                        <i class="fa-solid fa-video text-purple"></i>
+                        <div class="nav-item-text">
+                            <strong>Live Camera Scanner</strong>
+                            <span>Webcam viewfinder with laser guide</span>
+                        </div>
+                    </button>
+                    <button class="drawer-nav-item" id="btnDrawerNativeCam">
+                        <i class="fa-solid fa-camera text-emerald"></i>
+                        <div class="nav-item-text">
+                            <strong>Phone Camera Capture</strong>
+                            <span>Take photo directly with device camera</span>
+                        </div>
+                    </button>
+                    <button class="drawer-nav-item" id="btnDrawerAnalytics">
+                        <i class="fa-solid fa-chart-pie text-cyan"></i>
+                        <div class="nav-item-text">
+                            <strong>Analytics Dashboard</strong>
+                            <span>View extraction speeds & accuracy stats</span>
+                        </div>
+                    </button>
+                    <button class="drawer-nav-item" id="btnDrawerNewScan" style="display: none;">
+                        <i class="fa-solid fa-plus text-rose"></i>
+                        <div class="nav-item-text">
+                            <strong>New Scan</strong>
+                            <span>Reset workflow & process another file</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </aside>
 
         <!-- MAIN PROGRESSIVE VIEWPORT (Renders one step at a time with smooth transitions) -->
         <main class="progressive-viewport" id="progressiveViewport">
@@ -136,9 +225,14 @@
                             <p class="dropzone-desc">or click anywhere to browse from your device</p>
                         </div>
 
-                        <button class="btn btn-primary btn-lg" id="btnBrowseFiles">
-                            <i class="fa-solid fa-folder-open"></i> Browse Document File
-                        </button>
+                        <div class="dropzone-actions-wrap">
+                            <button class="btn btn-primary btn-lg" id="btnBrowseFiles">
+                                <i class="fa-solid fa-folder-open"></i> Browse Document File
+                            </button>
+                            <button class="btn btn-outline btn-lg mobile-cam-cta" id="btnDirectCameraTap">
+                                <i class="fa-solid fa-camera text-purple"></i> Capture Photo
+                            </button>
+                        </div>
 
                         <div class="dropzone-formats">
                             <span class="format-tag"><i class="fa-solid fa-file-pdf text-rose"></i> PDF (Native/Scanned)</span>
@@ -523,8 +617,18 @@
                     </div>
                 </div>
 
+                <!-- MOBILE VIEW TOGGLER (Allows mobile users to easily switch between Fields & Viewer) -->
+                <div class="mobile-results-view-tabs" id="mobileResultsViewTabs">
+                    <button class="mobile-view-tab-btn active" data-view="fields" id="btnMobileViewFields">
+                        <i class="fa-solid fa-list-check"></i> Extracted Fields (<span id="mobileFieldsCountBadge">32</span>)
+                    </button>
+                    <button class="mobile-view-tab-btn" data-view="viewer" id="btnMobileViewPreview">
+                        <i class="fa-solid fa-file-image"></i> Document Preview
+                    </button>
+                </div>
+
                 <!-- MAIN WORKSPACE: DOCUMENT VIEWER + EXTRACTION STUDIO -->
-                <div class="results-studio-layout">
+                <div class="results-studio-layout" data-active-view="fields">
                     <!-- LEFT COLUMN: INTERACTIVE DOCUMENT VIEWER WITH BOUNDING BOXES -->
                     <div class="results-viewer-panel">
                         <div class="results-viewer-header">
@@ -685,6 +789,6 @@
     </div>
 
     <!-- APPLICATION SCRIPTS -->
-    <script src="/js/app.js?v=20"></script>
+    <script src="/js/app.js?v=25"></script>
 </body>
 </html>

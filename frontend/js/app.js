@@ -162,6 +162,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Update Mobile Step Bar UI
+        const stepNames = {
+            1: 'Upload Ingestion',
+            2: 'Inspection & Clarity',
+            3: 'Deep OCR Scanning',
+            4: 'Results & Audit'
+        };
+        const mobileStepBadge = document.getElementById('mobileStepBadge');
+        const mobileStepName = document.getElementById('mobileStepName');
+        const mobileStepProgressFill = document.getElementById('mobileStepProgressFill');
+        if (mobileStepBadge) mobileStepBadge.textContent = `Step ${stepNum} of 4`;
+        if (mobileStepName) mobileStepName.textContent = stepNames[stepNum] || 'Processing';
+        if (mobileStepProgressFill) mobileStepProgressFill.style.width = `${stepNum * 25}%`;
+
+        document.querySelectorAll('.mobile-step-dots .step-dot').forEach(dot => {
+            const dStep = parseInt(dot.getAttribute('data-step'));
+            dot.classList.remove('active', 'completed');
+            if (dStep < stepNum) {
+                dot.classList.add('completed');
+            } else if (dStep === stepNum) {
+                dot.classList.add('active');
+            }
+        });
+
         // Switch Viewports
         Object.keys(stepPages).forEach(key => {
             const page = stepPages[key];
@@ -177,6 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Topbar "New Scan" button visibility
         if (btnProcessNewDoc) {
             btnProcessNewDoc.style.display = (stepNum >= 2) ? 'inline-flex' : 'none';
+        }
+        const btnDrawerNewScan = document.getElementById('btnDrawerNewScan');
+        if (btnDrawerNewScan) {
+            btnDrawerNewScan.style.display = (stepNum >= 2) ? 'flex' : 'none';
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -206,6 +234,78 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnQuickCamera) {
             btnQuickCamera.addEventListener('click', openCameraModal);
         }
+
+        // Mobile Drawer Toggle & Actions
+        const btnMobileMenuToggle = document.getElementById('btnMobileMenuToggle');
+        const btnCloseMobileDrawer = document.getElementById('btnCloseMobileDrawer');
+        const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
+        const mobileDrawer = document.getElementById('mobileDrawer');
+        const btnDrawerSample = document.getElementById('btnDrawerSample');
+        const btnDrawerCamera = document.getElementById('btnDrawerCamera');
+        const btnDrawerNativeCam = document.getElementById('btnDrawerNativeCam');
+        const btnDrawerAnalytics = document.getElementById('btnDrawerAnalytics');
+        const btnDrawerNewScan = document.getElementById('btnDrawerNewScan');
+
+        const openDrawer = () => {
+            if (mobileDrawer && mobileDrawerOverlay) {
+                mobileDrawer.classList.add('open');
+                mobileDrawerOverlay.classList.add('open');
+            }
+        };
+
+        const closeDrawer = () => {
+            if (mobileDrawer && mobileDrawerOverlay) {
+                mobileDrawer.classList.remove('open');
+                mobileDrawerOverlay.classList.remove('open');
+            }
+        };
+
+        if (btnMobileMenuToggle) btnMobileMenuToggle.addEventListener('click', openDrawer);
+        if (btnCloseMobileDrawer) btnCloseMobileDrawer.addEventListener('click', closeDrawer);
+        if (mobileDrawerOverlay) mobileDrawerOverlay.addEventListener('click', closeDrawer);
+
+        if (btnDrawerSample) {
+            btnDrawerSample.addEventListener('click', () => {
+                closeDrawer();
+                loadSampleInvoice();
+            });
+        }
+        if (btnDrawerCamera) {
+            btnDrawerCamera.addEventListener('click', () => {
+                closeDrawer();
+                openCameraModal();
+            });
+        }
+        if (btnDrawerNativeCam) {
+            btnDrawerNativeCam.addEventListener('click', () => {
+                closeDrawer();
+                if (cameraFileInput) cameraFileInput.click();
+            });
+        }
+        if (btnDrawerAnalytics) {
+            btnDrawerAnalytics.addEventListener('click', () => {
+                closeDrawer();
+                if (btnQuickAnalytics) btnQuickAnalytics.click();
+            });
+        }
+        if (btnDrawerNewScan) {
+            btnDrawerNewScan.addEventListener('click', () => {
+                closeDrawer();
+                resetWorkflow();
+            });
+        }
+
+        // Mobile Step Dots Click Navigation
+        document.querySelectorAll('.mobile-step-dots .step-dot').forEach(dot => {
+            dot.addEventListener('click', () => {
+                const targetStep = parseInt(dot.getAttribute('data-step'));
+                if (targetStep === 1) {
+                    resetWorkflow();
+                } else if (targetStep < currentStep) {
+                    goToStep(targetStep);
+                }
+            });
+        });
     }
 
     function resetWorkflow() {
@@ -227,8 +327,25 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupDropzone() {
         if (!mainDropzone || !mainFileInput) return;
 
+        const btnDirectCameraTap = document.getElementById('btnDirectCameraTap');
+        if (btnDirectCameraTap) {
+            btnDirectCameraTap.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (cameraFileInput) cameraFileInput.click();
+            });
+        }
+
+        if (cameraFileInput) {
+            cameraFileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    handleUserFile(e.target.files[0]);
+                }
+            });
+        }
+
         mainDropzone.addEventListener('click', (e) => {
-            if (e.target !== btnBrowseFiles && !btnBrowseFiles.contains(e.target)) {
+            if (e.target !== btnBrowseFiles && !btnBrowseFiles.contains(e.target) &&
+                e.target !== btnDirectCameraTap && (!btnDirectCameraTap || !btnDirectCameraTap.contains(e.target))) {
                 mainFileInput.click();
             }
         });
@@ -684,6 +801,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFieldCards(detectedFields);
         if (studioFieldCountBadge) studioFieldCountBadge.textContent = detectedFields.length;
         if (detectedCountPill) detectedCountPill.textContent = detectedFields.length;
+        const mobileFieldsCountBadge = document.getElementById('mobileFieldsCountBadge');
+        if (mobileFieldsCountBadge) mobileFieldsCountBadge.textContent = detectedFields.length;
 
         // 3. Render Audit Checklist Cards
         renderAuditChecks(verif);
@@ -978,11 +1097,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (btnCopyExtractedSummary) btnCopyExtractedSummary.addEventListener('click', copyFormattedSummary);
         if (btnCopySummaryBottom) btnCopySummaryBottom.addEventListener('click', copyFormattedSummary);
+
+        // Mobile View Toggle Tabs (Extracted Fields vs Document Preview)
+        const btnMobileViewFields = document.getElementById('btnMobileViewFields');
+        const btnMobileViewPreview = document.getElementById('btnMobileViewPreview');
+        const resultsStudioLayout = document.querySelector('.results-studio-layout');
+
+        if (btnMobileViewFields && resultsStudioLayout) {
+            btnMobileViewFields.addEventListener('click', () => {
+                resultsStudioLayout.setAttribute('data-active-view', 'fields');
+                btnMobileViewFields.classList.add('active');
+                if (btnMobileViewPreview) btnMobileViewPreview.classList.remove('active');
+            });
+        }
+
+        if (btnMobileViewPreview && resultsStudioLayout) {
+            btnMobileViewPreview.addEventListener('click', () => {
+                resultsStudioLayout.setAttribute('data-active-view', 'viewer');
+                btnMobileViewPreview.classList.add('active');
+                if (btnMobileViewFields) btnMobileViewFields.classList.remove('active');
+                if (currentAnalysisResult) {
+                    setTimeout(() => renderBoundingBoxes(currentAnalysisResult), 60);
+                }
+            });
+        }
     }
 
     // =========================================================================
     // MODALS: ANALYTICS & CAMERA
     // =========================================================================
+    let currentFacingMode = 'environment';
+    const btnSwitchCamera = document.getElementById('btnSwitchCamera');
+
     function setupModals() {
         if (btnQuickAnalytics) {
             btnQuickAnalytics.addEventListener('click', async () => {
@@ -1013,20 +1159,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnCaptureCamera) {
             btnCaptureCamera.addEventListener('click', captureCameraSnapshot);
         }
+
+        if (btnSwitchCamera) {
+            btnSwitchCamera.addEventListener('click', async () => {
+                currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+                if (webcamStream) {
+                    webcamStream.getTracks().forEach(track => track.stop());
+                }
+                try {
+                    webcamStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+                    });
+                    if (webcamVideo) webcamVideo.srcObject = webcamStream;
+                } catch (err) {
+                    console.error('Camera switch error:', err);
+                }
+            });
+        }
     }
 
     async function openCameraModal() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Camera not supported in this browser environment.');
+            if (cameraFileInput) {
+                cameraFileInput.click();
+            } else {
+                alert('Camera not supported in this browser environment.');
+            }
             return;
         }
         try {
-            webcamStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            webcamStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
             webcamVideo.srcObject = webcamStream;
             cameraModal.style.display = 'flex';
         } catch (err) {
-            console.error('Webcam error:', err);
-            alert('Could not access device camera. Please check permissions.');
+            console.warn('Webcam getUserMedia failed, falling back to native camera input:', err);
+            if (cameraFileInput) {
+                cameraFileInput.click();
+            } else {
+                alert('Could not access device camera. Please check permissions.');
+            }
         }
     }
 
@@ -1057,8 +1230,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`${API_BASE}/v1/health`);
             const data = await res.json();
-            if (data.status === 'online' && engineStatusText) {
-                engineStatusText.textContent = 'EasyOCR Deep Learning Ready';
+            if (data.status === 'online') {
+                if (engineStatusText) engineStatusText.textContent = 'EasyOCR Deep Learning Ready';
+                const drawerEngine = document.getElementById('drawerEngineStatusText');
+                if (drawerEngine) drawerEngine.textContent = 'EasyOCR Deep Learning Ready';
             }
         } catch (e) {
             // Ignore background health check errors
@@ -1074,4 +1249,15 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
+
+    // Responsive dynamic readjustment of SVG bounding boxes on window resize / orientation change
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (currentAnalysisResult && currentStep === 4) {
+                renderBoundingBoxes(currentAnalysisResult);
+            }
+        }, 150);
+    });
 });
