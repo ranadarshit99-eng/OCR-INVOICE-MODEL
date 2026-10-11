@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InvoiceAI Pro | Progressive Multi-Engine Document Intelligence & OCR</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Modern Progressive Theme CSS -->
+    <link rel="stylesheet" href="/css/style.css?v=20">
+</head>
+<body class="light-theme">
+    <div class="app-layout">
+        <!-- TOP NAVIGATION BAR -->
+        <header class="app-topbar">
+            <div class="topbar-brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-sparkles"></i>
+                </div>
+                <div class="brand-info">
+                    <div class="brand-title-row">
+                        <span class="brand-name">InvoiceAI</span>
+                        <span class="brand-badge">NEURAL STUDIO</span>
+                    </div>
+                    <span class="brand-sub">Multi-Engine OCR & Statutory Audit</span>
+                </div>
+            </div>
+
+            <!-- STEP PROGRESS BREADCRUMB (Logical Step Progression) -->
+            <nav class="steps-breadcrumb" id="stepsBreadcrumb" aria-label="Workflow Steps">
+                <div class="step-node active" id="stepNode1" data-step="1">
+                    <div class="node-circle">
+                        <span class="node-number">1</span>
+                        <i class="fa-solid fa-check node-check"></i>
+                    </div>
+                    <div class="node-text">
+                        <span class="node-sub">Step 01</span>
+                        <span class="node-title">Upload</span>
+                    </div>
+                </div>
+
+                <div class="node-connector" id="connector1"></div>
+
+                <div class="step-node" id="stepNode2" data-step="2">
+                    <div class="node-circle">
+                        <span class="node-number">2</span>
+                        <i class="fa-solid fa-check node-check"></i>
+                    </div>
+                    <div class="node-text">
+                        <span class="node-sub">Step 02</span>
+                        <span class="node-title">Inspect</span>
+                    </div>
+                </div>
+
+                <div class="node-connector" id="connector2"></div>
+
+                <div class="step-node" id="stepNode3" data-step="3">
+                    <div class="node-circle">
+                        <span class="node-number">3</span>
+                        <i class="fa-solid fa-arrows-rotate node-sync-icon"></i>
+                    </div>
+                    <div class="node-text">
+                        <span class="node-sub">Step 03</span>
+                        <span class="node-title">AI Sync</span>
+                    </div>
+                </div>
+
+                <div class="node-connector" id="connector3"></div>
+
+                <div class="step-node" id="stepNode4" data-step="4">
+                    <div class="node-circle">
+                        <span class="node-number">4</span>
+                        <i class="fa-solid fa-check node-check"></i>
+                    </div>
+                    <div class="node-text">
+                        <span class="node-sub">Step 04</span>
+                        <span class="node-title">Results</span>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- TOPBAR ACTIONS -->
+            <div class="topbar-actions">
+                <div class="status-pill-chip" id="engineStatusChip">
+                    <span class="status-dot-pulse"></span>
+                    <span id="engineStatusText">EasyOCR Deep Learning Ready</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btnQuickSample" title="Load High-Trust Enterprise Sample Invoice">
+                    <i class="fa-solid fa-wand-magic-sparkles text-indigo"></i> Instant Demo
+                </button>
+                <button class="btn btn-ghost btn-sm" id="btnQuickCamera" title="Live Video Camera Scanner">
+                    <i class="fa-solid fa-camera text-purple"></i> Camera
+                </button>
+                <button class="btn btn-ghost btn-sm" id="btnQuickAnalytics" title="Open Analytics Dashboard">
+                    <i class="fa-solid fa-chart-pie text-cyan"></i> Analytics
+                </button>
+                <button class="btn btn-outline btn-sm" id="btnProcessNewDoc" style="display: none;">
+                    <i class="fa-solid fa-plus"></i> New Scan
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN PROGRESSIVE VIEWPORT (Renders one step at a time with smooth transitions) -->
+        <main class="progressive-viewport" id="progressiveViewport">
+
+            <!-- ================================================================= -->
+            <!-- STEP 1: DOCUMENT INGESTION & UPLOAD                               -->
+            <!-- ================================================================= -->
+            <section class="step-page active" id="stepView1">
+                <div class="upload-hero-container">
+                    <div class="hero-badge-pill">
+                        <i class="fa-solid fa-bolt-lightning text-amber"></i>
+                        <span>Zero-Lag Optical Character Recognition & Statutory Validation</span>
+                    </div>
+                    <h1 class="hero-headline">Intelligent Invoice Ingestion</h1>
+                    <p class="hero-subtext">
+                        Upload your vendor invoice, tax bill, or purchase order to extract structured fields,
+                        detect tabular line items, and audit mathematical ledger totals.
+                    </p>
+
+                    <!-- INTERACTIVE DROPZONE -->
+                    <div class="interactive-dropzone" id="mainDropzone">
+                        <input type="file" id="mainFileInput" accept="image/*,.pdf" style="display: none;">
+                        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
+
+                        <div class="dropzone-radar-ring"></div>
+                        <div class="dropzone-icon-box">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <div class="dropzone-copy">
+                            <h3 class="dropzone-title">Drag & drop your document here</h3>
+                            <p class="dropzone-desc">or click anywhere to browse from your device</p>
+                        </div>
+
+                        <button class="btn btn-primary btn-lg" id="btnBrowseFiles">
+                            <i class="fa-solid fa-folder-open"></i> Browse Document File
+                        </button>
+
+                        <div class="dropzone-formats">
+                            <span class="format-tag"><i class="fa-solid fa-file-pdf text-rose"></i> PDF (Native/Scanned)</span>
+                            <span class="format-tag"><i class="fa-solid fa-file-image text-indigo"></i> PNG</span>
+                            <span class="format-tag"><i class="fa-solid fa-file-image text-cyan"></i> JPG / JPEG</span>
+                            <span class="format-tag"><i class="fa-solid fa-file-image text-emerald"></i> WEBP</span>
+                            <span class="format-tag"><i class="fa-solid fa-file-image text-amber"></i> TIFF</span>
+                        </div>
+                    </div>
+
+                    <!-- QUICK LAUNCH OPTIONS -->
+                    <div class="quick-launch-grid">
+                        <div class="quick-launch-card" id="cardLaunchSample">
+                            <div class="card-icon-circle bg-indigo-soft">
+                                <i class="fa-solid fa-wand-magic-sparkles text-indigo"></i>
+                            </div>
+                            <div class="card-text">
+                                <strong>Try Enterprise Sample Invoice</strong>
+                                <span>1-click test with GSTIN, 3 line items, bank ledger & stamp</span>
+                            </div>
+                            <i class="fa-solid fa-arrow-right card-arrow"></i>
+                        </div>
+
+                        <div class="quick-launch-card" id="cardLaunchCamera">
+                            <div class="card-icon-circle bg-purple-soft">
+                                <i class="fa-solid fa-camera text-purple"></i>
+                            </div>
+                            <div class="card-text">
+                                <strong>Camera Document Scanner</strong>
+                                <span>Capture a real invoice with auto-deskew & edge detection</span>
+                            </div>
+                            <i class="fa-solid fa-arrow-right card-arrow"></i>
+                        </div>
+                    </div>
+
+                    <!-- CAPABILITIES SUMMARY CHIPS -->
+                    <div class="capabilities-row">
+                        <div class="cap-chip"><i class="fa-solid fa-circle-check text-emerald"></i> EasyOCR Deep Learning</div>
+                        <div class="cap-chip"><i class="fa-solid fa-circle-check text-emerald"></i> 47 Statutory Tax Attributes</div>
+                        <div class="cap-chip"><i class="fa-solid fa-circle-check text-emerald"></i> Subtotal & Tax Math Audit</div>
+                        <div class="cap-chip"><i class="fa-solid fa-circle-check text-emerald"></i> Official Seal & Stamp AI</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================================= -->
+            <!-- STEP 2: INSPECT & CONFIGURE                                       -->
+            <!-- ================================================================= -->
+            <section class="step-page" id="stepView2" style="display: none;">
+                <div class="inspect-workspace-grid">
+                    <!-- LEFT COLUMN: HIGH RES DOCUMENT PREVIEW -->
+                    <div class="inspect-viewer-card">
+                        <div class="card-header-bar">
+                            <div class="viewer-meta-tag">
+                                <i class="fa-solid fa-file-lines text-indigo"></i>
+                                <span id="inspectFilename">document_sample.png</span>
+                            </div>
+                            <div class="viewer-zoom-controls">
+                                <button class="icon-tool-btn" id="btnZoomInInspect" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                                <button class="icon-tool-btn" id="btnZoomOutInspect" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                                <button class="icon-tool-btn" id="btnResetZoomInspect" title="Reset Zoom"><i class="fa-solid fa-arrows-to-dot"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- INTERACTIVE OPTICAL FILTER PILLS -->
+                        <div class="viewer-filters-bar">
+                            <span class="filters-label"><i class="fa-solid fa-wand-magic-sparkles text-indigo"></i> Optical Mode:</span>
+                            <button class="filter-pill-btn active" data-filter="standard"><i class="fa-solid fa-image"></i> Normal</button>
+                            <button class="filter-pill-btn" data-filter="contrast"><i class="fa-solid fa-circle-half-stroke"></i> CLAHE Sharp</button>
+                            <button class="filter-pill-btn" data-filter="grayscale"><i class="fa-solid fa-droplet-slash"></i> Grayscale</button>
+                            <button class="filter-pill-btn" data-filter="binarize"><i class="fa-solid fa-bolt"></i> B&W High-Contrast</button>
+                        </div>
+
+                        <div class="inspect-canvas-viewport" id="inspectCanvasViewport">
+                            <div class="canvas-image-layer" id="inspectCanvasLayer">
+                                <img id="inspectDocImg" src="" alt="Invoice Preview">
+                            </div>
+                        </div>
+
+                        <!-- SPATIAL TELEMETRY HUD -->
+                        <div class="viewer-telemetry-hud">
+                            <div class="hud-item"><i class="fa-solid fa-compass-drafting text-indigo"></i> <span>Orientation: <strong>0.0° Deskewed</strong></span></div>
+                            <div class="hud-item"><i class="fa-solid fa-file-invoice text-purple"></i> <span>Format: <strong>A4 Standard</strong></span></div>
+                            <div class="hud-item"><i class="fa-solid fa-sun text-amber"></i> <span>Luminance: <strong>98.4% Balanced</strong></span></div>
+                            <div class="hud-item"><i class="fa-solid fa-bullseye text-emerald"></i> <span>Resolution: <strong>300 DPI High-Def</strong></span></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: INSPECTION SPEC & START ACTION -->
+                    <div class="inspect-controls-card">
+                        <div class="controls-card-header">
+                            <div class="badge-icon-square">
+                                <i class="fa-solid fa-sliders"></i>
+                            </div>
+                            <div>
+                                <h2>Document Ready for Analysis</h2>
+                                <p>Verify document visual clarity, tax regime, and engine parameters.</p>
+                            </div>
+                        </div>
+
+                        <!-- PRE-FLIGHT READINESS GAUGE -->
+                        <div class="doc-health-card">
+                            <div class="health-radial-badge">
+                                <span class="health-num">98%</span>
+                                <span class="health-lbl">Fidelity</span>
+                            </div>
+                            <div class="health-details">
+                                <div class="health-title-row">
+                                    <strong>Optical Readiness Score</strong>
+                                    <span class="badge-pill-verified"><i class="fa-solid fa-circle-check"></i> OPTIMAL</span>
+                                </div>
+                                <div class="health-bars-grid">
+                                    <div class="health-bar-item">
+                                        <div class="hb-labels"><span>Text Sharpness</span><span>99%</span></div>
+                                        <div class="hb-track"><div class="hb-fill" style="width: 99%;"></div></div>
+                                    </div>
+                                    <div class="health-bar-item">
+                                        <div class="hb-labels"><span>Contrast Balance</span><span>96%</span></div>
+                                        <div class="hb-track"><div class="hb-fill" style="width: 96%;"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DOCUMENT CLASSIFICATION & METRICS SUMMARY -->
+                        <div class="doc-classification-box">
+                            <span class="classification-tag"><i class="fa-solid fa-sparkles text-amber"></i> Auto-Classified:</span>
+                            <strong>Commercial B2B Tax Invoice</strong>
+                            <span class="pill-auto-tag">99.1% Match</span>
+                        </div>
+
+                        <div class="doc-specs-box">
+                            <div class="spec-row">
+                                <span class="spec-label">Document Name</span>
+                                <span class="spec-value" id="specDocName">invoice-sample.png</span>
+                            </div>
+                            <div class="spec-row">
+                                <span class="spec-label">File Size</span>
+                                <span class="spec-value" id="specDocSize">142 KB</span>
+                            </div>
+                            <div class="spec-row">
+                                <span class="spec-label">Format / MIME</span>
+                                <span class="spec-value" id="specDocFormat">PNG Image</span>
+                            </div>
+                        </div>
+
+                        <!-- TAX & STATUTORY REGIME PRESET SELECTOR -->
+                        <div class="config-section">
+                            <label class="config-label"><i class="fa-solid fa-scale-balanced text-cyan"></i> Statutory Tax & Audit Profile</label>
+                            <div class="regime-chips-row">
+                                <button class="regime-chip" data-regime="india"><i class="fa-solid fa-landmark"></i> 🇮🇳 India GST & HSN</button>
+                                <button class="regime-chip" data-regime="us"><i class="fa-solid fa-dollar-sign"></i> 🇺🇸 US Sales Tax</button>
+                                <button class="regime-chip" data-regime="eu"><i class="fa-solid fa-euro-sign"></i> 🇪🇺 EU VAT</button>
+                                <button class="regime-chip active" data-regime="auto"><i class="fa-solid fa-globe"></i> Global Auto</button>
+                            </div>
+                        </div>
+
+                        <!-- ESTIMATED EXTRACTION PREVIEW -->
+                        <div class="estimated-output-card">
+                            <div class="est-item">
+                                <i class="fa-solid fa-layer-group text-indigo"></i>
+                                <div>
+                                    <strong>32+ Document Attributes</strong>
+                                    <span>Vendor, GSTIN, Dates, Financials</span>
+                                </div>
+                            </div>
+                            <div class="est-item">
+                                <i class="fa-solid fa-table-cells text-purple"></i>
+                                <div>
+                                    <strong>Line Items Table Grid</strong>
+                                    <span>Descriptions, Quantities, Unit Prices</span>
+                                </div>
+                            </div>
+                            <div class="est-item">
+                                <i class="fa-solid fa-bolt text-emerald"></i>
+                                <div>
+                                    <strong>Est. Latency: ~0.15s</strong>
+                                    <span>Zero-Wait Deep Learning Pipeline</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ACTION BUTTONS -->
+                        <div class="inspect-actions-footer">
+                            <!-- SYNC START BUTTON WITH MORPHING ANIMATED STATE -->
+                            <button class="btn btn-sync-primary" id="btnStartSyncExtraction">
+                                <span class="btn-sync-icon-wrap">
+                                    <i class="fa-solid fa-arrows-rotate sync-spin-icon"></i>
+                                    <i class="fa-solid fa-bolt static-bolt-icon"></i>
+                                </span>
+                                <span class="btn-sync-text" id="syncBtnText">Start AI Sync & Extraction</span>
+                            </button>
+
+                            <button class="btn btn-outline" id="btnBackToUpload">
+                                <i class="fa-solid fa-rotate-left"></i> Change Document
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================================= -->
+            <!-- STEP 3: LIVE SYNC & SCANNING STAGE                                -->
+            <!-- ================================================================= -->
+            <section class="step-page" id="stepView3" style="display: none;">
+                <div class="sync-processing-layout">
+                    <!-- LEFT COLUMN: LIVE SCANNING DOCUMENT (LASER SWEEP ANIMATION) -->
+                    <div class="sync-scanner-card">
+                        <div class="scanner-header-bar">
+                            <div class="scanner-live-badge">
+                                <span class="live-dot-pulse"></span>
+                                <span>LIVE OPTICAL SCANNING</span>
+                            </div>
+                            <span class="scanner-timer" id="syncLiveTimer">0.00s</span>
+                        </div>
+
+                        <div class="sync-scan-canvas" id="syncScanCanvas">
+                            <img id="syncDocImg" src="" alt="Scanning invoice">
+                            <!-- LASER SCAN LINE ANIMATION -->
+                            <div class="laser-scanner-line" id="laserScannerLine">
+                                <div class="laser-beam-glow"></div>
+                                <div class="laser-sweep-line"></div>
+                            </div>
+                            <div class="scanning-grid-overlay"></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: REAL-TIME ENGINE SYNCHRONIZATION HOLOGRAM CARD -->
+                    <div class="sync-hologram-card">
+                        <div class="hologram-header">
+                            <div class="holo-spinner-ring">
+                                <div class="holo-spinner-inner">
+                                    <i class="fa-solid fa-brain"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 class="holo-title">Live Document Intelligence Sync</h2>
+                                <p class="holo-subtitle" id="holoStatusLine">Scanning pages & extracting document attributes...</p>
+                            </div>
+                        </div>
+
+                        <!-- LIVE TELEMETRY HUD -->
+                        <div class="holo-telemetry-grid">
+                            <div class="holo-telem-card">
+                                <span class="telem-label"><i class="fa-solid fa-file-invoice text-indigo"></i> Document Input</span>
+                                <strong class="telem-val" id="holoTelemDoc">PDF / Image Buffer</strong>
+                            </div>
+                            <div class="holo-telem-card">
+                                <span class="telem-label"><i class="fa-solid fa-cubes text-purple"></i> Recognized Words</span>
+                                <strong class="telem-val" id="holoTelemWords">Scanning...</strong>
+                            </div>
+                            <div class="holo-telem-card">
+                                <span class="telem-label"><i class="fa-solid fa-crosshairs text-emerald"></i> OCR Confidence</span>
+                                <strong class="telem-val" id="holoTelemConf">95.4%</strong>
+                            </div>
+                            <div class="holo-telem-card">
+                                <span class="telem-label"><i class="fa-solid fa-bolt text-amber"></i> AI Pipeline</span>
+                                <strong class="telem-val">PyMuPDF + EasyOCR</strong>
+                            </div>
+                        </div>
+
+                        <!-- PROGRESS BAR & PERCENT -->
+                        <div class="holo-progress-block">
+                            <div class="holo-prog-label-row">
+                                <span class="holo-prog-stage" id="holoCurrentStageText">Stage 1 of 4: Loading Document Buffer</span>
+                                <span class="holo-prog-percent" id="holoCurrentPercent">25%</span>
+                            </div>
+                            <div class="holo-progress-track">
+                                <div class="holo-progress-bar-fill" id="holoProgressFill" style="width: 25%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 4 CLEAR & INTUITIVE PIPELINE STAGES -->
+                        <div class="holo-phases-list">
+                            <div class="holo-phase-item active" id="syncPhase1">
+                                <div class="phase-status-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                                <div class="phase-meta">
+                                    <strong>1. Document Page Ingestion</strong>
+                                    <span>Reading PDF / image buffer & optical layout</span>
+                                </div>
+                            </div>
+
+                            <div class="holo-phase-item pending" id="syncPhase2">
+                                <div class="phase-status-icon"><i class="fa-regular fa-circle"></i></div>
+                                <div class="phase-meta">
+                                    <strong>2. OCR Text Recognition</strong>
+                                    <span>Scanning words, lines & spatial bounding boxes</span>
+                                </div>
+                            </div>
+
+                            <div class="holo-phase-item pending" id="syncPhase3">
+                                <div class="phase-status-icon"><i class="fa-regular fa-circle"></i></div>
+                                <div class="phase-meta">
+                                    <strong>3. Key-Value & Entity Extraction</strong>
+                                    <span>Extracting dates, amounts, parties & custom fields</span>
+                                </div>
+                            </div>
+
+                            <div class="holo-phase-item pending" id="syncPhase4">
+                                <div class="phase-status-icon"><i class="fa-regular fa-circle"></i></div>
+                                <div class="phase-meta">
+                                    <strong>4. Results Finalization</strong>
+                                    <span>Structuring data & preparing Interactive Studio</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LIVE STREAM TICKER -->
+                        <div class="holo-stream-terminal">
+                            <div class="stream-title-bar">
+                                <span><i class="fa-solid fa-terminal text-cyan"></i> Live Extraction Stream</span>
+                                <span class="stream-pill"><i class="fa-solid fa-bolt"></i> Real-time</span>
+                            </div>
+                            <div class="stream-log-scroll" id="streamLogScroll">
+                                <div class="log-entry">[INIT] Loaded invoice buffer into OCR memory</div>
+                            </div>
+                        </div>
+
+                        <!-- LIVE DISCOVERED ENTITY TAGS -->
+                        <div class="holo-tags-preview">
+                            <span class="tags-title"><i class="fa-solid fa-sparkles text-amber"></i> Live Detected Entities:</span>
+                            <div class="tags-cloud" id="holoTagsCloud">
+                                <!-- Filled live -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================================= -->
+            <!-- STEP 4: RESULTS DASHBOARD & AUDIT STUDIO                          -->
+            <!-- ================================================================= -->
+            <section class="step-page" id="stepView4" style="display: none;">
+                <!-- EXECUTIVE METRICS STRIP -->
+                <div class="executive-kpi-ribbon">
+                    <!-- KPI 1: AUTHENTICITY SCORE -->
+                    <div class="kpi-card kpi-authenticity">
+                        <div class="kpi-score-radial" id="resultsScoreRadial">
+                            <span id="resultsScoreVal">100%</span>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="kpi-label">Authenticity Rating</span>
+                            <strong class="kpi-title text-emerald" id="resultsGradeTitle">Authentic / High Trust</strong>
+                            <span class="kpi-sub" id="resultsGradeSub">All document fields verified</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: GRAND TOTAL AMOUNT -->
+                    <div class="kpi-card kpi-amount">
+                        <div class="kpi-icon-pill bg-indigo-soft">
+                            <i class="fa-solid fa-receipt text-indigo"></i>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="kpi-label">Grand Total Amount</span>
+                            <strong class="kpi-title" id="resultsGrandTotal">$ 0.00</strong>
+                            <span class="kpi-sub" id="resultsSubtotalTag">Subtotal: $ 0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 3: MATH VERIFICATION -->
+                    <div class="kpi-card kpi-math">
+                        <div class="kpi-icon-pill bg-emerald-soft">
+                            <i class="fa-solid fa-calculator text-emerald"></i>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="kpi-label">Math Verification</span>
+                            <strong class="kpi-title text-emerald" id="resultsMathStatus">Sum Reconciled (PASS)</strong>
+                            <span class="kpi-sub" id="resultsMathFormula">150,000 + 13,500 + 13,500 = 177,000</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 4: DETECTED ENTITIES COUNT -->
+                    <div class="kpi-card kpi-count">
+                        <div class="kpi-icon-pill bg-purple-soft">
+                            <i class="fa-solid fa-layer-group text-purple"></i>
+                        </div>
+                        <div class="kpi-meta">
+                            <span class="kpi-label">Extracted Attributes</span>
+                            <strong class="kpi-title" id="resultsFieldCount">32 Document Fields</strong>
+                            <span class="kpi-sub" id="resultsModelConfidence">Model Confidence: 94.8%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN WORKSPACE: DOCUMENT VIEWER + EXTRACTION STUDIO -->
+                <div class="results-studio-layout">
+                    <!-- LEFT COLUMN: INTERACTIVE DOCUMENT VIEWER WITH BOUNDING BOXES -->
+                    <div class="results-viewer-panel">
+                        <div class="results-viewer-header">
+                            <div class="viewer-active-file">
+                                <i class="fa-solid fa-file-image text-indigo"></i>
+                                <span id="resultsDocFilename">sample_invoice.png</span>
+                            </div>
+                            <div class="viewer-toolbar-buttons">
+                                <button class="btn btn-sm btn-accent active" id="btnToggleResultFields" title="Toggle Field Bounding Boxes">
+                                    <i class="fa-solid fa-vector-square"></i> Fields
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="btnToggleResultWords" title="Toggle Word Bounding Boxes">
+                                    <i class="fa-solid fa-grip"></i> Words
+                                </button>
+                                <button class="icon-tool-btn" id="btnZoomInResults"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                                <button class="icon-tool-btn" id="btnZoomOutResults"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                                <button class="icon-tool-btn" id="btnResetZoomResults"><i class="fa-solid fa-arrows-to-dot"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="results-image-viewport" id="resultsImageViewport">
+                            <div class="results-canvas-layer" id="resultsCanvasLayer">
+                                <img id="resultsInvoiceImg" src="" alt="Analyzed Invoice">
+                                <svg id="resultsBoundingSvg" class="results-svg-overlay"></svg>
+                            </div>
+                            <div id="resultsSvgTooltip" class="results-svg-tooltip"></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: EXTRACTION STUDIO TABS -->
+                    <div class="results-studio-panel">
+                        <div class="studio-tabs-bar">
+                            <button class="studio-tab-btn active" data-tab="tab-detected-fields" id="tabBtnDetected">
+                                <i class="fa-solid fa-list-check"></i> Extracted Fields
+                                <span class="tab-count-badge" id="studioFieldCountBadge">32</span>
+                            </button>
+                            <button class="studio-tab-btn" data-tab="tab-raw-json" id="tabBtnRaw">
+                                <i class="fa-solid fa-code"></i> Raw JSON & Export
+                            </button>
+                        </div>
+
+                        <div class="studio-tab-contents">
+                            <!-- SUB-TAB 1: DETECTED FIELDS LIST -->
+                            <div class="studio-tab-pane active" id="tab-detected-fields">
+                                <div class="fields-search-ribbon">
+                                    <div class="search-input-box">
+                                        <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                                        <input type="text" id="studioFieldSearch" placeholder="Filter extracted attributes (e.g. Invoice No, GSTIN, Total)...">
+                                    </div>
+                                    <div class="fields-view-toggle">
+                                        <button class="toggle-btn active" id="btnToggleActiveOnly">Document Detected (<span id="detectedCountPill">32</span>)</button>
+                                        <button class="toggle-btn" id="btnToggleFull47">Full 47 Template</button>
+                                    </div>
+                                </div>
+
+                                <!-- DYNAMIC FIELDS CONTAINER (RENDERED VERTICALLY IN CARDS) -->
+                                <div class="detected-fields-card-stack" id="studioFieldsCardStack">
+                                    <!-- Populated dynamically by app.js -->
+                                </div>
+
+                                <!-- FULL 47 TEMPLATE CONTAINER (TOGGLED ON DEMAND) -->
+                                <div class="all-47-template-container" id="studioAll47Container" style="display: none;">
+                                    <!-- Injected or toggled -->
+                                </div>
+                            </div>
+
+                            <!-- SUB-TAB 3: RAW JSON & EXPORT -->
+                            <div class="studio-tab-pane" id="tab-raw-json" style="display: none;">
+                                <div class="json-actions-bar">
+                                    <button class="btn btn-outline btn-sm" id="btnCopyJson"><i class="fa-solid fa-copy"></i> Copy JSON</button>
+                                    <button class="btn btn-primary btn-sm" id="btnDownloadJson"><i class="fa-solid fa-download"></i> Download JSON</button>
+                                    <button class="btn btn-accent btn-sm" id="btnCopyExtractedSummary"><i class="fa-solid fa-clipboard-check"></i> Copy Summary</button>
+                                </div>
+                                <pre class="raw-json-block" id="rawJsonBlock"><code>{}</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- STUDIO BOTTOM ACTIONS -->
+                        <div class="studio-bottom-actions">
+                            <button class="btn btn-primary" id="btnStartAnotherScan">
+                                <i class="fa-solid fa-arrow-left"></i> Scan Another Document
+                            </button>
+                            <button class="btn btn-outline" id="btnCopySummaryBottom">
+                                <i class="fa-solid fa-clipboard-check"></i> Copy Formatted Summary
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODALS: ANALYTICS & CAMERA SCANNER                                    -->
+    <!-- ===================================================================== -->
+
+    <!-- ANALYTICS MODAL -->
+    <div class="modal-backdrop" id="analyticsModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <i class="fa-solid fa-chart-line text-cyan"></i>
+                    <h3>Enterprise Analytics Summary</h3>
+                </div>
+                <button class="icon-tool-btn" id="btnCloseAnalyticsModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="analyticsModalBody">
+                <div class="analytics-metrics-grid">
+                    <div class="stat-card">
+                        <span class="stat-num" id="statTotalAnalyzed">0</span>
+                        <span class="stat-label">Invoices Processed</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statAvgSpeed">0.18s</span>
+                        <span class="stat-label">Avg Extraction Speed</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statAvgAccuracy">96.4%</span>
+                        <span class="stat-label">Avg Confidence</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-num" id="statTotalAmount">$0.00</span>
+                        <span class="stat-label">Total Ledger Value</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIVE CAMERA MODAL -->
+    <div class="modal-backdrop" id="cameraModal" style="display: none;">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <i class="fa-solid fa-video text-purple"></i>
+                    <h3>Live Video Camera Scanner</h3>
+                </div>
+                <button class="icon-tool-btn" id="btnCloseCameraModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="camera-stream-wrapper">
+                    <video id="webcamVideo" autoplay playsinline muted></video>
+                    <canvas id="cameraCanvas" style="display: none;"></canvas>
+                    <div class="camera-target-crosshairs">
+                        <div class="crosshair-corner tl"></div>
+                        <div class="crosshair-corner tr"></div>
+                        <div class="crosshair-corner bl"></div>
+                        <div class="crosshair-corner br"></div>
+                        <div class="camera-laser-scan-line"></div>
+                    </div>
+                </div>
+                <div class="camera-controls-bar">
+                    <button class="btn btn-outline" id="btnSwitchCamera"><i class="fa-solid fa-camera-rotate"></i> Flip Camera</button>
+                    <button class="btn btn-primary btn-lg" id="btnCaptureCamera"><i class="fa-solid fa-camera"></i> Capture & Process</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION SCRIPTS -->
+    <script src="/js/app.js?v=20"></script>
+</body>
+</html>

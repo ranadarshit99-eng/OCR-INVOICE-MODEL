@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: invoice-ai-ocr
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
