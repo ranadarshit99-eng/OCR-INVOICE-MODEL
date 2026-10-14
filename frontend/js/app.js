@@ -612,8 +612,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData
             });
 
+            if (!res.ok) {
+                let errorDetails = `Server error (HTTP ${res.status})`;
+                try {
+                    const errorJson = await res.json();
+                    if (errorJson && (errorJson.detail || errorJson.message)) {
+                        errorDetails = errorJson.detail || errorJson.message;
+                    }
+                } catch (_) {
+                    try {
+                        const errorText = await res.text();
+                        if (errorText) {
+                            const clean = errorText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                            if (clean) errorDetails += `: ${clean.substring(0, 160)}`;
+                        }
+                    } catch (_) {}
+                }
+                throw new Error(errorDetails);
+            }
+
             const data = await res.json();
             currentAnalysisResult = data;
+
 
             // Update previews if backend returned a rendered image page
             if (data.preview_url) {

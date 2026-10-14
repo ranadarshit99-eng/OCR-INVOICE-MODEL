@@ -201,7 +201,7 @@ async def analyze_invoice_endpoint(
 
         # Step 1: Run OCR Engine for Text & Bounding Boxes
         ocr_result_raw = ocr_engine.process_file(file_bytes, filename or "invoice.png")
-        ocr_result = ocr_engine.extract_text_and_boxes(file_bytes, filename=filename or "invoice.png")
+        ocr_result = ocr_engine.extract_text_and_boxes(file_bytes, filename=filename or "invoice.png", cached_res=ocr_result_raw)
 
         # Step 2: Run ML / Heuristic Invoice Parsers
         parsed_result = invoice_parser.parse(ocr_result, filename=filename)
@@ -276,7 +276,7 @@ def health_check():
         "status": "online",
         "timestamp": time.time(),
         "ocr_engines": {
-            "easyocr_available": ocr_engine.easyocr_reader is not None,
+            "easyocr_available": ocr_engine.easyocr_available,
             "fitz_available": True,
             "pytesseract_available": PYTESSERACT_AVAILABLE
         },
