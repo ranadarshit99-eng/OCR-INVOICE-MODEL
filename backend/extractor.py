@@ -50,13 +50,27 @@ def fix_ifsc_ocr_typos(raw_str: str) -> str:
 
 
 def parse_float_clean(val_str: str) -> float:
-    """Parse numeric currency strings handling OCR noise, European formats, and standard currency."""
+    """Parse numeric currency strings handling OCR noise, European formats, Indian lakh systems, and standard currency."""
     if not val_str:
         return 0.0
     s = str(val_str).strip()
-    s = re.sub(r'^(?:INR|USD|EUR|GBP|Rs\.?|₹|\$|\€|\£|[\{\}\(\)\[\]\|]+)', '', s, flags=re.IGNORECASE).strip()
-    s = re.sub(r'(?:INR|USD|EUR|GBP|Rs\.?|₹|\$|\€|\£)$', '', s, flags=re.IGNORECASE).strip()
+    s = re.sub(r'^(?:INR|USD|EUR|GBP|CAD|Rs\.?|₹|\$|\€|\£|[\{\}\(\)\[\]\|]+)', '', s, flags=re.IGNORECASE).strip()
+    s = re.sub(r'(?:INR|USD|EUR|GBP|CAD|Rs\.?|₹|\$|\€|\£)$', '', s, flags=re.IGNORECASE).strip()
     s = re.sub(r'(\d)\s+(\d)', r'\1\2', s)
+    s = re.sub(r',(\d),', r'\1,', s)
+
+    # Strip OCR artifact 'S' or 's' when standing for '$' before a digit
+    if (s.startswith('S') or s.startswith('s')) and len(s) > 1 and s[1].isdigit():
+        s = s[1:].strip()
+
+    # Handle Indian Lakh/Crore integer format (e.g. 7,92,000 or 1,50,000 or 12,500)
+    # or standard thousand commas (e.g. 65,000)
+    if re.search(r'^\d{1,3}(?:,\d{2})*,\d{3}$', s) or re.search(r'^\d{1,3}(?:,\d{3})+$', s):
+        clean = s.replace(',', '')
+        try:
+            return float(clean)
+        except ValueError:
+            return 0.0
 
     if ',' in s and '.' not in s:
         if s.count(',') > 1:
@@ -334,56 +348,67 @@ class InvoiceExtractor:
     def detect_currency(self, text: str, regime: str = "auto") -> str:
         regime_lower = (regime or "auto").lower()
 
-        # 1. Direct explicit currency symbols in the text ALWAYS take precedence
-        if "$" in text:
-            return "$"
-        if "₹" in text:
+        # Check regime if explicitly specified by user
+        if regime_lower == "india":
             return "₹"
-        if "€" in text:
-            return "€"
-        if "£" in text:
-            return "£"
-
-        # Explicit currency word codes in text
-        if re.search(r'\b(?:USD|dollars?|CAD)\b', text, re.IGNORECASE):
-            return "$"
-        if re.search(r'\b(?:INR|Rs\.?|Rupees?)\b', text, re.IGNORECASE):
-            return "₹"
-        if re.search(r'\b(?:EUR|Euros?)\b', text, re.IGNORECASE):
-            return "€"
-        if re.search(r'\b(?:GBP|Pounds?)\b', text, re.IGNORECASE):
-            return "£"
-
-        # OCR artifact: $ often recognized as 'S' followed by digits and decimals
-        if re.search(r'\bS\d+[\.,]\d{2}\b', text):
-            return "$"
-
-        # 2. Regional cues for India
-        indian_cues = ["gstin", "cgst", "sgst", "igst", "hsn", "sac", "udyam", "msme", "maharashtra", "gujarat", "delhi", "karnataka", "tamil nadu", "bengaluru", "mumbai", "india", "pvt ltd", "private limited"]
-        has_indian_cues = any(c in text.lower() for c in indian_cues)
-
-        # 3. Regional cues for US / North America ($)
-        us_cues = ["united states", "usa", "ein", "social security", "federal tax", "sales tax", "canada", "ontario", "toronto"]
-        has_us_cues = any(c in text.lower() for c in us_cues) or bool(
-            re.search(r'\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)[;,\s]+\d{5}\b', text)
-        ) or bool(re.search(r'\b\d{3}-\d{2}-\d{4}\b', text))
-
-        # Check regime if specified (only if document cues don't directly conflict)
-        if regime_lower == "india" and (has_indian_cues or not has_us_cues):
-            return "₹"
-        elif regime_lower in ["us", "usa"] and (has_us_cues or not has_indian_cues):
+        elif regime_lower in ["us", "usa"]:
             return "$"
         elif regime_lower in ["eu", "europe"]:
             return "€"
         elif regime_lower in ["uk", "gbp"]:
             return "£"
 
-        # Auto detection from cues
+        # 1. Direct explicit currency symbols in the text
+        if "₹" in text or "INR" in text or "Rs." in text or "Rupees" in text:
+            return "₹"
+        if "€" in text or "EUR" in text or "Euros" in text:
+            return "€"
+        if "£" in text or "GBP" in text or "Pounds" in text:
+            return "£"
+        if "$" in text or "USD" in text or "CAD" in text:
+            return "$"
+
+        # 2. Regional cues for India (ITR, PAN, GSTIN, Indian States)
+        indian_cues = [
+            "income tax return", "itr-", "pan", "gstin", "cgst", "sgst", "igst",
+            "hsn", "sac", "udyam", "msme", "maharashtra", "gujarat", "delhi",
+            "karnataka", "tamil nadu", "bengaluru", "mumbai", "india", "pvt ltd",
+            "private limited", "assessment year", "date of filing"
+        ]
+        has_indian_cues = any(c in text.lower() for c in indian_cues) or bool(
+            re.search(r'\b[A-Z]{5}\d{4}[A-Z]\b', text)
+        )
         if has_indian_cues:
             return "₹"
+
+        # 3. UK Cues (GB IBAN, VAT number, British postal / terms)
+        if bool(re.search(r'\b(?:IRAM|IBAN)?[:\s]*GB\d{2}[A-Za-z0-9]+\b', text, re.IGNORECASE)):
+            if "vat" in text.lower() or "uk" in text.lower() or "london" in text.lower():
+                return "£"
+
+        # 4. European Cues (EU IBAN, VAT)
+        if bool(re.search(r'\b(?:IRAM|IBAN)?[:\s]*(?:DE|FR|ES|IT|NL|BE|AT)\d{2}[A-Za-z0-9]+\b', text, re.IGNORECASE)):
+            return "€"
+
+        # 5. Canadian Cues (uses $)
+        if any(c in text.lower() for c in ["canada", "ontario", "toronto", "newmarket", "scarborough"]) or bool(
+            re.search(r'\b[A-Z]\d[A-Z]\s*\d[A-Z]\d\b', text)
+        ):
+            return "$"
+
+        # 6. US Cues ($)
+        us_cues = ["united states", "usa", "ein", "social security", "federal tax", "sales tax"]
+        has_us_cues = any(c in text.lower() for c in us_cues) or bool(
+            re.search(r'\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)[;,\s]+\d{5}\b', text)
+        ) or bool(re.search(r'\b\d{3}-\d{2}-\d{4}\b', text))
         if has_us_cues:
             return "$"
-        if "iban" in text.lower() or "vat" in text.lower():
+
+        # 7. OCR artifact: $ often recognized as 'S' followed by digits and decimals
+        if re.search(r'\bS\d+[\.,]\d{2}\b', text):
+            return "$"
+
+        if "vat" in text.lower() or "iban" in text.lower():
             return "€"
 
         return "$"
@@ -392,7 +417,18 @@ class InvoiceExtractor:
         curr = self.detect_currency(text, regime=regime)
         lines = [l.strip() for l in text.split('\n') if l.strip()]
 
-        amt_regex = r'(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*[\.,][0-9]{2}|[0-9]+[\.,][0-9]{2})'
+        amt_regex = (
+            r'(?:INR|USD|EUR|GBP|CAD|Rs\.?|₹|\$|€|£|S)?\s*'
+            r'('
+            r'\d{1,3}(?:,\d{2})*,\d{3}(?:\.\d{2})?'  # Indian lakh/crore format (e.g. 7,92,000 or 7,92,000.00)
+            r'|'
+            r'\d{1,3}(?:,\d{3})+(?:\.\d{2})?'        # Standard thousand commas (e.g. 65,000 or 1,234.56)
+            r'|'
+            r'\d{1,3}(?:\.\d{3})+,\d{2}'            # European thousand dot (e.g. 1.234,56)
+            r'|'
+            r'\d+[\.,]\d{2}'                         # Raw decimal (e.g. 197.48 or 1447,00)
+            r')'
+        )
 
         tax_id_exclusions = [
             r"\btax\s*(?:id|identification|no|num|number|reg|registration|code|tin|payer|invoice)\b",
@@ -403,15 +439,25 @@ class InvoiceExtractor:
             r"\bincl(?:uding)?\b"
         ]
 
+        def is_table_header_line(idx: int, line: str) -> bool:
+            """Check if a line matching 'total' or 'amount' is actually a table column header."""
+            line_clean = line.strip().lower()
+            if line_clean in ["total", "amount", "total (inr)", "total ($)", "total amount", "line total"]:
+                surrounding = " ".join(lines[max(0, idx - 3):min(len(lines), idx + 4)]).lower()
+                if any(k in surrounding for k in ["quantity", "qty", "unit price", "price", "description", "item", "particulars", "rate"]):
+                    return True
+            return False
+
         def find_amount(label_patterns: List[str], exclude_patterns: Optional[List[str]] = None, allow_int: bool = True) -> float:
-            for idx, line in enumerate(lines):
-                if exclude_patterns and any(re.search(ex, line, re.IGNORECASE) for ex in exclude_patterns):
-                    continue
-                for pat in label_patterns:
+            for pat in label_patterns:
+                for idx, line in enumerate(lines):
+                    if is_table_header_line(idx, line):
+                        continue
+                    if exclude_patterns and any(re.search(ex, line, re.IGNORECASE) for ex in exclude_patterns):
+                        continue
                     if re.search(pat, line, re.IGNORECASE):
                         # 1. Search in same line after label
                         tail = re.sub(pat, '', line, flags=re.IGNORECASE).strip()
-                        # Scrub hyphenated IDs like 903-73-3743 or 930-75-1312 so digits aren't mistaken for currency
                         tail_clean = re.sub(r'\b\d{2,4}[-\/]\d{2,4}[-\/]\d{2,6}\b', '', tail)
                         tail_clean = re.sub(r'\b\d{3,}[-\/]\d{2,}\b', '', tail_clean)
 
@@ -429,28 +475,40 @@ class InvoiceExtractor:
                             for ia in reversed(int_amts):
                                 val = parse_float_clean(ia)
                                 if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
+                                    has_sym = any(s in tail_clean for s in ['$', '€', '£', '₹', 'INR', 'USD'])
+                                    if not has_sym and (',' not in ia) and val <= 50:
+                                        continue
                                     return val
 
                         # 2. Check next 1-4 lines for standalone amount
                         for next_idx in range(idx + 1, min(idx + 5, len(lines))):
                             next_line = lines[next_idx]
                             if any(re.search(lbl, next_line, re.IGNORECASE) for lbl in [
-                                r"^(?:seller|client|buyer|billed to|ship to|items|terms|bank|payment\s*details|thank\s*you)",
+                                r"^(?:seller|client|buyer|billed to|ship to|terms|bank|payment|invoice details|terms and conditions|return electronically)",
                             ]):
+                                break
+                            if is_table_header_line(next_idx, next_line):
                                 break
                             if exclude_patterns and any(re.search(ex, next_line, re.IGNORECASE) for ex in exclude_patterns):
                                 continue
                             next_line_clean = re.sub(r'\b\d{2,4}[-\/]\d{2,4}[-\/]\d{2,6}\b', '', next_line)
                             next_line_clean = re.sub(r'\b\d{3,}[-\/]\d{2,}\b', '', next_line_clean)
+                            next_line_clean = re.sub(r',(\d),', r'\1,', next_line_clean)
+
                             amts_next = re.findall(amt_regex, next_line_clean, re.IGNORECASE)
                             if amts_next:
                                 val = parse_float_clean(amts_next[-1])
                                 if val > 0:
                                     return val
                             if allow_int:
+                                has_curr_sym = bool(re.search(r'(?:INR|USD|EUR|GBP|CAD|Rs\.?|₹|\$|€|£)', next_line, re.IGNORECASE))
+                                has_sep = (',' in next_line) or ('.' in next_line)
                                 m_pure_num = re.search(r'^(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})\s*$', next_line_clean, re.IGNORECASE)
                                 if m_pure_num:
                                     val = parse_float_clean(m_pure_num.group(1))
+                                    # Ignore standalone table row/item numbers (<= 50) without currency symbol or separators
+                                    if not has_curr_sym and not has_sep and val <= 50:
+                                        continue
                                     if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
                                         return val
             return 0.0
@@ -464,10 +522,11 @@ class InvoiceExtractor:
         shipping = find_amount([r"\bshipping\b", r"\bfreight\b", r"\bdelivery\b", r"\bhanding\b", r"\bhandling\b"])
         grand_total = find_amount([
             r"\bgrand\s*total\b",
-            r"\btotal\s*amount\b",
             r"\btotal\s*due\b",
-            r"\bamount\s*due\b",
+            r"\bt[o0][tl][a4][tl]\s*due\b",
             r"\btotal\s*payable\b",
+            r"\bamount\s*due\b",
+            r"\btotal\s*amount\b",
             r"\bbalance\s*due\b",
             r"\binvoice\s*total\b",
             r"^total[:\s]*[\$€£₹0-9S]",
@@ -475,6 +534,19 @@ class InvoiceExtractor:
         ])
         paid = find_amount([r"\bamount\s*paid\b", r"\bpaid\s*amount\b"])
         bal = find_amount([r"\bbalance\s*due\b", r"\boutstanding\b"])
+
+        # Check if Income Tax Return (ITR) or tax assessment document
+        is_itr = any(k in text.lower() for k in [
+            "income tax return", "itr-", "taxable income and tax details", "total income", "taxes paid", "assessment year"
+        ])
+        if is_itr:
+            tot_income = find_amount([r"\btotal\s*income\b", r"\btaxable\s*income\b", r"\bgross\s*total\s*income\b"])
+            taxes_paid = find_amount([r"\btaxes\s*paid\b", r"\btax\s*payable\b", r"\btotal\s*tax\b"])
+            if tot_income > 0:
+                grand_total = tot_income
+                subtotal = tot_income
+                if taxes_paid > 0:
+                    other_taxes = taxes_paid
 
         # Check for Summary / Net worth / Gross worth / VAT table blocks
         summary_idx = -1
@@ -551,8 +623,15 @@ class InvoiceExtractor:
         # Sanity Guard: Tax can never equal or exceed Grand Total
         if grand_total > 0.0:
             if other_taxes >= grand_total:
-                logger.warning(f"Sanity Check: Tax ({other_taxes}) >= Grand Total ({grand_total}). Setting tax to 0.0")
-                other_taxes = 0.0
+                if subtotal > 0.0 and grand_total > subtotal:
+                    derived_tax = round(grand_total - subtotal - shipping + discount, 2)
+                    if 0 < derived_tax < grand_total:
+                        other_taxes = derived_tax
+                    else:
+                        other_taxes = 0.0
+                else:
+                    logger.warning(f"Sanity Check: Tax ({other_taxes}) >= Grand Total ({grand_total}). Setting tax to 0.0")
+                    other_taxes = 0.0
             if (cgst + sgst + igst) >= grand_total:
                 logger.warning(f"Sanity Check: GST Taxes ({cgst + sgst + igst}) >= Grand Total ({grand_total}). Setting to 0.0")
                 cgst, sgst, igst = 0.0, 0.0, 0.0
@@ -570,15 +649,73 @@ class InvoiceExtractor:
         total_tax = cgst + sgst + igst + other_taxes
         calc_total = round(subtotal - discount + total_tax + shipping, 2)
 
-        if subtotal > 0.0 and (total_tax > 0.0 or shipping > 0.0):
-            if grand_total == 0.0 or grand_total <= subtotal or abs(grand_total - calc_total) <= 1.0:
-                grand_total = calc_total
+        # Check if OCR misread currency symbols ($/£) as leading digits 5, 6, or 8 (e.g. $237.48 -> 5237.48, $12.48 -> 512.48, $215 -> 6215)
+        if not is_itr and abs(calc_total - grand_total) > 0.5:
+            cand_gt = [grand_total]
+            s_gt = f"{grand_total:.2f}"
+            if s_gt[0] in '568' and len(s_gt.split('.')[0]) >= 3:
+                cand_gt.append(float(s_gt[1:]))
 
-        if subtotal == 0.0 and grand_total > 0.0:
-            if total_tax > 0.0 and total_tax < grand_total:
-                subtotal = max(0.0, round(grand_total - total_tax + discount - shipping, 2))
-            else:
-                subtotal = grand_total
+            cand_tax = [other_taxes]
+            s_tax = f"{other_taxes:.2f}"
+            if s_tax[0] in '568' and len(s_tax.split('.')[0]) >= 2:
+                cand_tax.append(float(s_tax[1:]))
+
+            cand_sub = [subtotal]
+            s_sub = f"{subtotal:.2f}"
+            if s_sub[0] in '568' and len(s_sub.split('.')[0]) >= 3:
+                cand_sub.append(float(s_sub[1:]))
+
+            reconciled = False
+            for g in cand_gt:
+                for t in cand_tax:
+                    for s in cand_sub:
+                        c_tot = round(s - discount + (cgst + sgst + igst + t) + shipping, 2)
+                        if abs(c_tot - g) <= 0.05 and g > 0 and s > 0:
+                            grand_total = g
+                            other_taxes = t
+                            subtotal = s
+                            total_tax = cgst + sgst + igst + other_taxes
+                            calc_total = c_tot
+                            reconciled = True
+                            break
+                    if reconciled:
+                        break
+                if reconciled:
+                    break
+
+            if not reconciled and len(cand_gt) > 1:
+                for g in cand_gt[1:]:
+                    for t in cand_tax:
+                        derived_sub = round(g - (cgst + sgst + igst + t) - shipping + discount, 2)
+                        if derived_sub > 0:
+                            grand_total = g
+                            other_taxes = t
+                            subtotal = derived_sub
+                            total_tax = cgst + sgst + igst + other_taxes
+                            calc_total = round(subtotal - discount + total_tax + shipping, 2)
+                            reconciled = True
+                            break
+                    if reconciled:
+                        break
+
+        if not is_itr:
+            if subtotal > 0.0 and (total_tax > 0.0 or shipping > 0.0):
+                if grand_total == 0.0 or grand_total <= subtotal or abs(grand_total - calc_total) <= 1.0:
+                    grand_total = calc_total
+
+            if subtotal == 0.0 and grand_total > 0.0:
+                if total_tax > 0.0 and total_tax < grand_total:
+                    subtotal = max(0.0, round(grand_total - total_tax + discount - shipping, 2))
+                else:
+                    subtotal = grand_total
+
+            # Guard: Grand Total must never be less than Subtotal
+            if subtotal > 0.0 and grand_total < subtotal:
+                if calc_total >= subtotal:
+                    grand_total = calc_total
+                else:
+                    grand_total = subtotal
 
         if grand_total == 0.0:
             if calc_total > 0.0:
@@ -593,14 +730,22 @@ class InvoiceExtractor:
                         subtotal = grand_total
 
         # Final sanity reconciliation: ensure tax never equals grand total and subtotal is populated
-        total_tax = cgst + sgst + igst + other_taxes
-        if grand_total > 0.0 and total_tax >= grand_total:
-            other_taxes = 0.0
-            total_tax = cgst + sgst + igst
-            if total_tax >= grand_total:
-                cgst, sgst, igst, total_tax = 0.0, 0.0, 0.0, 0.0
-            if subtotal == 0.0 or subtotal >= grand_total:
-                subtotal = grand_total
+        if not is_itr:
+            total_tax = cgst + sgst + igst + other_taxes
+            if grand_total > 0.0 and total_tax >= grand_total:
+                if subtotal > 0.0 and grand_total > subtotal:
+                    derived_tax = round(grand_total - subtotal - shipping + discount, 2)
+                    if 0 < derived_tax < grand_total:
+                        other_taxes = derived_tax
+                    else:
+                        other_taxes = 0.0
+                else:
+                    other_taxes = 0.0
+                total_tax = cgst + sgst + igst + other_taxes
+                if total_tax >= grand_total:
+                    cgst, sgst, igst, total_tax = 0.0, 0.0, 0.0, 0.0
+                if subtotal == 0.0 or subtotal >= grand_total:
+                    subtotal = grand_total
 
         if bal == 0.0 and grand_total > 0.0 and paid > 0 and paid < grand_total:
             bal = max(0.0, round(grand_total - paid, 2))
@@ -616,7 +761,8 @@ class InvoiceExtractor:
             "grand_total": grand_total,
             "currency": curr,
             "amount_paid": paid,
-            "outstanding_balance": bal
+            "outstanding_balance": bal,
+            "is_itr": is_itr
         }
 
     def extract_line_items(self, text: str, word_boxes: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
@@ -923,11 +1069,13 @@ class InvoiceExtractor:
         if fin.get("igst_amount", 0.0) > 0:
             add_if_present("igst_amount", "IGST Amount", f"{curr} {fin.get('igst_amount', 0.0):,.2f}", "Financials", 93)
         if fin.get("other_taxes", 0.0) > 0:
-            add_if_present("other_taxes", "Tax / VAT Amount", f"{curr} {fin.get('other_taxes', 0.0):,.2f}", "Financials", 94)
+            tax_label = "Taxes Paid / Tax Deposited" if "itr" in str(basic.get("invoice_type", "")).lower() or "income tax" in raw_text.lower() else "Tax / VAT Amount"
+            add_if_present("other_taxes", tax_label, f"{curr} {fin.get('other_taxes', 0.0):,.2f}", "Financials", 94)
         if fin.get("shipping_charges", 0.0) > 0:
             add_if_present("shipping_charges", "Shipping & Freight", f"{curr} {fin.get('shipping_charges', 0.0):,.2f}", "Financials", 91)
         if fin.get("grand_total", 0.0) > 0:
-            add_if_present("grand_total", "Grand Total (Gross Amount)", f"{curr} {fin.get('grand_total', 0.0):,.2f}", "Financials", 98)
+            gt_label = "Total Income (Gross)" if "itr" in str(basic.get("invoice_type", "")).lower() or "income tax" in raw_text.lower() else "Grand Total (Gross Amount)"
+            add_if_present("grand_total", gt_label, f"{curr} {fin.get('grand_total', 0.0):,.2f}", "Financials", 98)
 
         # Category F: Payment Details
         add_if_present("payment_method", "Payment Method", pay.get("payment_method"), "Payment Details", 88)

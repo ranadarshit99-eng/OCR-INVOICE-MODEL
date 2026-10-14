@@ -261,17 +261,43 @@ class InvoiceParser:
             if sym in full_text:
                 financials["currency"] = code
                 break
-        if financials["currency"] == "USD" and ("₹" in full_text or "INR" in full_text or "gstin" in full_text.lower()):
+        if financials["currency"] == "USD" and ("₹" in full_text or "INR" in full_text or "gstin" in full_text.lower() or "income tax" in full_text.lower() or "pan" in full_text.lower()):
             financials["currency"] = "INR"
+        elif "£" in full_text or "GBP" in full_text or ("GB" in full_text and "vat" in full_text.lower()):
+            financials["currency"] = "GBP"
+        elif "€" in full_text or "EUR" in full_text:
+            financials["currency"] = "EUR"
         elif "S" in full_text and re.search(r'\bS\d+[\.,]\d{2}\b', full_text):
             financials["currency"] = "USD"
 
-        amount_pattern = r'(?:INR|USD|EUR|GBP|Rs\.?|[\$€£₹S]\s*)?([0-9]{1,3}(?:[,\s][0-9]{3})*(?:[\.,][0-9]{2})|[0-9]+(?:[\.,][0-9]{2})|[0-9]{2,7})'
+        amount_pattern = (
+            r'(?:INR|USD|EUR|GBP|CAD|Rs\.?|[\$€£₹S]\s*)?'
+            r'('
+            r'\d{1,3}(?:,\d{2})*,\d{3}(?:\.\d{2})?'
+            r'|'
+            r'\d{1,3}(?:,\d{3})+(?:\.\d{2})?'
+            r'|'
+            r'\d{1,3}(?:\.\d{3})+,\d{2}'
+            r'|'
+            r'\d+[\.,]\d{2}'
+            r'|'
+            r'\d{2,7}'
+            r')'
+        )
 
         def parse_amt(raw_str):
             s = str(raw_str).strip()
-            s = re.sub(r'^(?:INR|USD|EUR|GBP|Rs\.?|₹|\$|\€|\£|S)', '', s, flags=re.IGNORECASE).strip()
+            s = re.sub(r'^(?:INR|USD|EUR|GBP|CAD|Rs\.?|₹|\$|\€|\£|S)', '', s, flags=re.IGNORECASE).strip()
             s = re.sub(r'(\d)\s+(\d)', r'\1\2', s)
+            s = re.sub(r',(\d),', r'\1,', s)
+            if (s.startswith('S') or s.startswith('s')) and len(s) > 1 and s[1].isdigit():
+                s = s[1:].strip()
+            if re.search(r'^\d{1,3}(?:,\d{2})*,\d{3}$', s) or re.search(r'^\d{1,3}(?:,\d{3})+$', s):
+                clean = s.replace(',', '')
+                try:
+                    return float(clean)
+                except ValueError:
+                    return 0.0
             if ',' in s and '.' not in s:
                 if s.count(',') > 1:
                     parts = s.split(',')
@@ -280,7 +306,10 @@ class InvoiceParser:
                     parts = s.split(',')
                     s = parts[0] + "." + parts[1] if len(parts[-1]) == 2 else parts[0] + parts[1]
             elif ',' in s and '.' in s:
-                s = s.replace(',', '')
+                if s.rfind(',') > s.rfind('.'):
+                    s = s.replace('.', '').replace(',', '.')
+                else:
+                    s = s.replace(',', '')
             clean = re.sub(r'[^\d\.]', '', s)
             try:
                 return float(clean)
@@ -288,7 +317,14 @@ class InvoiceParser:
                 return 0.0
 
         for idx, line in enumerate(lines):
-            text_lower = line["text"].lower()
+            text_lower = line["text"].lower().strip()
+
+            # Skip table column headers named 'total' or 'amount'
+            if text_lower in ["total", "amount", "line total"]:
+                surrounding = " ".join([lines[k]["text"] for k in range(max(0, idx - 3), min(len(lines), idx + 4))]).lower()
+                if any(x in surrounding for x in ["quantity", "qty", "price", "description", "item", "rate"]):
+                    continue
+
             amounts = re.findall(amount_pattern, line["text"])
 
             val = 0.0
@@ -296,10 +332,17 @@ class InvoiceParser:
             if amounts:
                 val = parse_amt(amounts[-1])
             elif idx + 1 < len(lines):
-                next_amounts = re.findall(amount_pattern, lines[idx+1]["text"])
-                if next_amounts:
-                    val = parse_amt(next_amounts[-1])
-                    box = lines[idx+1]["box"]
+                next_t = lines[idx+1]["text"].strip()
+                if re.match(r'^\d{1,2}$', next_t) and int(next_t) <= 50 and idx + 2 < len(lines):
+                    next_amounts = re.findall(amount_pattern, lines[idx+2]["text"])
+                    if next_amounts:
+                        val = parse_amt(next_amounts[-1])
+                        box = lines[idx+2]["box"]
+                else:
+                    next_amounts = re.findall(amount_pattern, next_t)
+                    if next_amounts:
+                        val = parse_amt(next_amounts[-1])
+                        box = lines[idx+1]["box"]
 
             # Multi-column summary line (e.g. Total / Summary with Subtotal, Tax, and Grand Total)
             if len(amounts) >= 3 and any(k in text_lower for k in ["total", "summary", "vat", "net"]):
@@ -319,7 +362,7 @@ class InvoiceParser:
             if "subtotal" in text_lower or "sub total" in text_lower or "net amount" in text_lower or "net worth" in text_lower or "nct worth" in text_lower:
                 if not financials["subtotal"]:
                     financials["subtotal"] = {"value": val, "box": box, "confidence": 92.0}
-            elif any(k in text_lower for k in ["grand total", "total amount", "gross worth", "grora wonth", "amount due", "total due", "total payable", "balance due", "invoice total"]) or (text_lower.startswith("total") and not any(x in text_lower for x in ["taxable", "subtotal", "sub total"])):
+            elif any(k in text_lower for k in ["grand total", "total amount", "gross worth", "grora wonth", "amount due", "total due", "tolal due", "total payable", "balance due", "invoice total", "total income"]) or (text_lower.startswith("total") and not any(x in text_lower for x in ["taxable", "subtotal", "sub total", "qty", "quantity", "price", "description", "rate", "item"])):
                 if not financials["total"] or val > financials["total"]["value"]:
                     financials["total"] = {"value": val, "box": box, "confidence": 95.0}
             elif any(k in text_lower for k in ["cgst", "sgst", "igst", "tax", "vat", "gst"]):
@@ -339,6 +382,50 @@ class InvoiceParser:
         tax = financials["tax"]["value"] if financials["tax"] else 0.0
         disc = financials["discount"]["value"] if financials["discount"] else 0.0
         tot = financials["total"]["value"] if financials["total"] else 0.0
+
+        # Check OCR misread currency symbols ($/£) as leading digits (5, 6, 8)
+        if tot > 0 and (sub > 0 or tax > 0):
+            cand_tot = [tot]
+            s_tot = f"{tot:.2f}"
+            if s_tot[0] in '568' and len(s_tot.split('.')[0]) >= 3:
+                cand_tot.append(float(s_tot[1:]))
+
+            cand_tax = [tax]
+            s_tax = f"{tax:.2f}"
+            if s_tax[0] in '568' and len(s_tax.split('.')[0]) >= 2:
+                cand_tax.append(float(s_tax[1:]))
+
+            cand_sub = [sub]
+            s_sub = f"{sub:.2f}"
+            if s_sub[0] in '568' and len(s_sub.split('.')[0]) >= 3:
+                cand_sub.append(float(s_sub[1:]))
+
+            reconciled = False
+            for g in cand_tot:
+                for t in cand_tax:
+                    for s in cand_sub:
+                        if abs((s + t - disc) - g) <= 0.05 and g > 0 and s > 0:
+                            tot, tax, sub = g, t, s
+                            if financials["total"]: financials["total"]["value"] = tot
+                            if financials["tax"]: financials["tax"]["value"] = tax
+                            if financials["subtotal"]: financials["subtotal"]["value"] = sub
+                            reconciled = True
+                            break
+                    if reconciled: break
+                if reconciled: break
+
+            if not reconciled and len(cand_tot) > 1:
+                for g in cand_tot[1:]:
+                    for t in cand_tax:
+                        d_sub = round(g - t + disc, 2)
+                        if d_sub > 0:
+                            tot, tax, sub = g, t, d_sub
+                            if financials["total"]: financials["total"]["value"] = tot
+                            if financials["tax"]: financials["tax"]["value"] = tax
+                            if financials["subtotal"]: financials["subtotal"]["value"] = sub
+                            reconciled = True
+                            break
+                    if reconciled: break
 
         # Sanity: Tax cannot equal or exceed Grand Total
         if tot > 0 and tax >= tot:

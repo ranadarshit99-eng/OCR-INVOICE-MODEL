@@ -32,14 +32,21 @@ class InvoiceValidator:
         calculated_total = round(subtotal - discount + cgst + sgst + igst + other_tax + shipping, 2)
         diff = abs(calculated_total - grand_total)
 
-        is_valid = diff <= 1.0  # Allow 1 currency unit tolerance for rounding
+        is_itr = fin.get("is_itr", False)
+        if is_itr:
+            is_valid = (grand_total > 0 and grand_total >= other_tax)
+            diff = 0.0 if is_valid else diff
+            status_msg = f"ITR Total Income ({grand_total}) and Taxes Deposited ({other_tax}) validated." if is_valid else f"Total Income ({grand_total}) is less than taxes paid ({other_tax})."
+        else:
+            is_valid = diff <= 1.0  # Allow 1 currency unit tolerance for rounding
+            status_msg = "Total amount matches mathematical sum" if is_valid else f"Discrepancy of {diff:.2f} detected between calculated sum ({calculated_total}) and recorded total ({grand_total})."
 
         return {
             "is_valid": is_valid,
             "calculated_grand_total": calculated_total,
             "recorded_grand_total": grand_total,
             "discrepancy": round(diff, 2),
-            "status_message": "Total amount matches mathematical sum" if is_valid else f"Discrepancy of {diff:.2f} detected between calculated sum ({calculated_total}) and recorded total ({grand_total})."
+            "status_message": status_msg
         }
 
     def validate_tax_calculations(self, fin: Dict[str, Any]) -> Dict[str, Any]:
