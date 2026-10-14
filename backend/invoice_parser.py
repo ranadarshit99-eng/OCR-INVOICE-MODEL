@@ -316,18 +316,23 @@ class InvoiceParser:
             if val <= 0:
                 continue
 
-            if "subtotal" in text_lower or "sub total" in text_lower or "net amount" in text_lower or "net worth" in text_lower:
+            if "subtotal" in text_lower or "sub total" in text_lower or "net amount" in text_lower or "net worth" in text_lower or "nct worth" in text_lower:
                 if not financials["subtotal"]:
                     financials["subtotal"] = {"value": val, "box": box, "confidence": 92.0}
+            elif any(k in text_lower for k in ["grand total", "total amount", "gross worth", "grora wonth", "amount due", "total due", "total payable", "balance due", "invoice total"]) or (text_lower.startswith("total") and not any(x in text_lower for x in ["taxable", "subtotal", "sub total"])):
+                if not financials["total"] or val > financials["total"]["value"]:
+                    financials["total"] = {"value": val, "box": box, "confidence": 95.0}
             elif any(k in text_lower for k in ["cgst", "sgst", "igst", "tax", "vat", "gst"]):
-                if not financials["tax"]:
-                    financials["tax"] = {"value": val, "box": box, "confidence": 90.0}
+                # Exclude lines that are tax identifiers or totals
+                if not any(ex in text_lower for ex in ["tax id", "tax no", "tax num", "tax number", "tax reg", "taxable", "tax invoice", "vat id", "vat no", "total", "incl"]):
+                    if not financials["tax"]:
+                        financials["tax"] = {"value": val, "box": box, "confidence": 90.0}
             elif "discount" in text_lower:
                 if not financials["discount"]:
                     financials["discount"] = {"value": val, "box": box, "confidence": 88.0}
-            elif any(k in text_lower for k in ["total", "grand total", "gross worth", "amount due", "total due", "total payable", "balance due"]):
+            elif "total" in text_lower and not any(x in text_lower for x in ["taxable", "subtotal"]):
                 if not financials["total"] or val > financials["total"]["value"]:
-                    financials["total"] = {"value": val, "box": box, "confidence": 95.0}
+                    financials["total"] = {"value": val, "box": box, "confidence": 93.0}
 
         # Math reconciliation
         sub = financials["subtotal"]["value"] if financials["subtotal"] else 0.0
@@ -335,10 +340,18 @@ class InvoiceParser:
         disc = financials["discount"]["value"] if financials["discount"] else 0.0
         tot = financials["total"]["value"] if financials["total"] else 0.0
 
+        # Sanity: Tax cannot equal or exceed Grand Total
+        if tot > 0 and tax >= tot:
+            financials["tax"] = None
+            tax = 0.0
+
         if sub > 0 and tot == 0 and tax > 0:
             financials["total"] = {"value": round(sub + tax - disc, 2), "box": financials["subtotal"]["box"], "confidence": 90.0}
-        elif tot > 0 and sub == 0 and tax > 0:
-            financials["subtotal"] = {"value": round(tot - tax + disc, 2), "box": financials["total"]["box"], "confidence": 90.0}
+        elif tot > 0 and sub == 0:
+            if tax > 0 and tax < tot:
+                financials["subtotal"] = {"value": round(tot - tax + disc, 2), "box": financials["total"]["box"], "confidence": 90.0}
+            else:
+                financials["subtotal"] = {"value": tot, "box": financials["total"]["box"], "confidence": 90.0}
 
         return financials
 

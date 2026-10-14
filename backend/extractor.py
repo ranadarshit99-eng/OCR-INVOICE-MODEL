@@ -394,23 +394,42 @@ class InvoiceExtractor:
 
         amt_regex = r'(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:[,\s][0-9]{3})*[\.,][0-9]{2}|[0-9]+[\.,][0-9]{2})'
 
-        def find_amount(label_patterns: List[str]) -> float:
+        tax_id_exclusions = [
+            r"\btax\s*(?:id|identification|no|num|number|reg|registration|code|tin|payer|invoice)\b",
+            r"\bvat\s*(?:id|identification|no|num|number|reg|registration|tin)\b",
+            r"\bgst(?:in)?\s*(?:id|no|num|number)\b",
+            r"\btaxable\b",
+            r"\btotal\b",
+            r"\bincl(?:uding)?\b"
+        ]
+
+        def find_amount(label_patterns: List[str], exclude_patterns: Optional[List[str]] = None, allow_int: bool = True) -> float:
             for idx, line in enumerate(lines):
+                if exclude_patterns and any(re.search(ex, line, re.IGNORECASE) for ex in exclude_patterns):
+                    continue
                 for pat in label_patterns:
                     if re.search(pat, line, re.IGNORECASE):
                         # 1. Search in same line after label
                         tail = re.sub(pat, '', line, flags=re.IGNORECASE).strip()
-                        amts = re.findall(amt_regex, tail, re.IGNORECASE)
+                        # Scrub hyphenated IDs like 903-73-3743 or 930-75-1312 so digits aren't mistaken for currency
+                        tail_clean = re.sub(r'\b\d{2,4}[-\/]\d{2,4}[-\/]\d{2,6}\b', '', tail)
+                        tail_clean = re.sub(r'\b\d{3,}[-\/]\d{2,}\b', '', tail_clean)
+
+                        amts = re.findall(amt_regex, tail_clean, re.IGNORECASE)
                         if amts:
                             val = parse_float_clean(amts[-1])
                             if val > 0:
                                 return val
+
                         # Check whole number in same line tail (e.g. "Sub Total: 1552" or "Total Due: 1602")
-                        int_amts = re.findall(r'(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})', tail, re.IGNORECASE)
-                        for ia in reversed(int_amts):
-                            val = parse_float_clean(ia)
-                            if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
-                                return val
+                        if allow_int:
+                            int_amts = re.findall(r'(?:INR|\$|€|£|₹|Rs\.?|S)\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})', tail_clean, re.IGNORECASE)
+                            if not int_amts:
+                                int_amts = re.findall(r'(?<![-\d\/])([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})(?![-\d\/])', tail_clean)
+                            for ia in reversed(int_amts):
+                                val = parse_float_clean(ia)
+                                if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
+                                    return val
 
                         # 2. Check next 1-4 lines for standalone amount
                         for next_idx in range(idx + 1, min(idx + 5, len(lines))):
@@ -419,25 +438,29 @@ class InvoiceExtractor:
                                 r"^(?:seller|client|buyer|billed to|ship to|items|terms|bank|payment\s*details|thank\s*you)",
                             ]):
                                 break
-                            amts_next = re.findall(amt_regex, next_line, re.IGNORECASE)
+                            if exclude_patterns and any(re.search(ex, next_line, re.IGNORECASE) for ex in exclude_patterns):
+                                continue
+                            next_line_clean = re.sub(r'\b\d{2,4}[-\/]\d{2,4}[-\/]\d{2,6}\b', '', next_line)
+                            next_line_clean = re.sub(r'\b\d{3,}[-\/]\d{2,}\b', '', next_line_clean)
+                            amts_next = re.findall(amt_regex, next_line_clean, re.IGNORECASE)
                             if amts_next:
                                 val = parse_float_clean(amts_next[-1])
                                 if val > 0:
                                     return val
-                            # If line is purely a numeric value (e.g. "1552" or "S1552" or "1602" or "50")
-                            m_pure_num = re.search(r'^(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})\s*$', next_line, re.IGNORECASE)
-                            if m_pure_num:
-                                val = parse_float_clean(m_pure_num.group(1))
-                                if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
-                                    return val
+                            if allow_int:
+                                m_pure_num = re.search(r'^(?:INR|\$|€|£|₹|Rs\.?|S)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{1,7})\s*$', next_line_clean, re.IGNORECASE)
+                                if m_pure_num:
+                                    val = parse_float_clean(m_pure_num.group(1))
+                                    if val > 0 and val not in [1900, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]:
+                                        return val
             return 0.0
 
         subtotal = find_amount([r"\bsub\s*total\b", r"\bsubtotal\b", r"\btaxable\s*value\b"])
         discount = find_amount([r"\btotal\s*discount\b", r"\bdiscount\b"])
-        cgst = find_amount([r"\bcgst\b", r"\bcentral\s*gst\b"])
-        sgst = find_amount([r"\bsgst\b", r"\bstate\s*gst\b"])
-        igst = find_amount([r"\bigst\b", r"\bintegrated\s*gst\b"])
-        other_taxes = find_amount([r"\bother\s*tax\b", r"\bsales\s*tax\b"])
+        cgst = find_amount([r"\bcgst\b", r"\bcentral\s*gst\b"], exclude_patterns=tax_id_exclusions, allow_int=False)
+        sgst = find_amount([r"\bsgst\b", r"\bstate\s*gst\b"], exclude_patterns=tax_id_exclusions, allow_int=False)
+        igst = find_amount([r"\bigst\b", r"\bintegrated\s*gst\b"], exclude_patterns=tax_id_exclusions, allow_int=False)
+        other_taxes = find_amount([r"\bother\s*tax\b", r"\bsales\s*tax\b"], exclude_patterns=tax_id_exclusions, allow_int=False)
         shipping = find_amount([r"\bshipping\b", r"\bfreight\b", r"\bdelivery\b", r"\bhanding\b", r"\bhandling\b"])
         grand_total = find_amount([
             r"\bgrand\s*total\b",
@@ -462,45 +485,77 @@ class InvoiceExtractor:
 
         if summary_idx != -1:
             summary_lines = lines[summary_idx:]
-            total_line_idx = -1
-            for j, sline in enumerate(summary_lines):
-                if re.match(r'^total\b', sline, re.IGNORECASE):
-                    total_line_idx = j
-                    break
+            summary_amts = []
+            for sline in summary_lines[1:min(14, len(summary_lines))]:
+                if re.search(r'^(?:vat|net|gross|summary|items?|description)\b', sline, re.IGNORECASE):
+                    continue
+                # 1. OCR space-separated decimal like "55 57" -> 55.57
+                m_space = re.findall(r'\b(\d{1,4})\s+(\d{2})\b', sline)
+                for m1, m2 in m_space:
+                    val = float(f"{m1}.{m2}")
+                    if val > 0 and val not in summary_amts:
+                        summary_amts.append(val)
+                # 2. Standard decimal / comma numbers like "611.75" or "1447,00"
+                m_nums = re.findall(amt_regex, sline)
+                for mn in m_nums:
+                    v = parse_float_clean(mn)
+                    if v > 0 and v not in summary_amts:
+                        summary_amts.append(v)
 
-            if total_line_idx != -1:
-                amts_under_total = []
-                for m in re.findall(amt_regex, summary_lines[total_line_idx]):
-                    v = parse_float_clean(m)
-                    if v > 0: amts_under_total.append(v)
-                for next_idx in range(total_line_idx + 1, min(total_line_idx + 6, len(summary_lines))):
-                    for m in re.findall(amt_regex, summary_lines[next_idx]):
-                        v = parse_float_clean(m)
-                        if v > 0 and v not in amts_under_total:
-                            amts_under_total.append(v)
+            if len(summary_amts) >= 3:
+                gt = max(summary_amts)
+                others = [x for x in summary_amts if x != gt]
+                if len(others) >= 2:
+                    tax_cand = min(others)
+                    sub_cand = max(others)
+                    if abs((sub_cand + tax_cand) - gt) <= 2.0:
+                        if subtotal == 0.0: subtotal = sub_cand
+                        if other_taxes == 0.0 and cgst == 0.0 and sgst == 0.0 and igst == 0.0: other_taxes = tax_cand
+                        if grand_total == 0.0: grand_total = gt
+                    else:
+                        if subtotal == 0.0: subtotal = summary_amts[0]
+                        if other_taxes == 0.0 and cgst == 0.0 and sgst == 0.0 and igst == 0.0: other_taxes = summary_amts[1]
+                        if grand_total == 0.0: grand_total = summary_amts[2]
+                else:
+                    if grand_total == 0.0: grand_total = gt
+            elif len(summary_amts) == 2:
+                v_min, v_max = min(summary_amts), max(summary_amts)
+                if other_taxes == 0.0 and cgst == 0.0 and sgst == 0.0 and igst == 0.0:
+                    other_taxes = v_min
+                if grand_total == 0.0:
+                    grand_total = v_max
+                if subtotal == 0.0:
+                    subtotal = round(grand_total - other_taxes, 2)
+            elif len(summary_amts) == 1:
+                if grand_total == 0.0:
+                    grand_total = summary_amts[0]
 
-                if len(amts_under_total) >= 3:
-                    if subtotal == 0.0:
-                        subtotal = amts_under_total[0]
-                    if other_taxes == 0.0 and cgst == 0.0 and sgst == 0.0 and igst == 0.0:
-                        other_taxes = amts_under_total[1]
-                    if grand_total == 0.0 or grand_total == subtotal:
-                        grand_total = amts_under_total[2]
-                elif len(amts_under_total) == 2:
-                    if subtotal == 0.0:
-                        subtotal = min(amts_under_total)
-                    if grand_total == 0.0:
-                        grand_total = max(amts_under_total)
-                    if other_taxes == 0.0:
-                        other_taxes = round(grand_total - subtotal, 2)
-
-        # Direct search for "Net worth" and "Gross worth" if still missing
+        # Direct search for "Net worth" and "Gross worth" if still missing (with OCR typo tolerance)
         if subtotal == 0.0:
-            subtotal = find_amount([r"\bnet\s*worth\b", r"\bnet\s*amount\b"])
+            subtotal = find_amount([
+                r"\bnet\s*worth\b", r"\bn[ec]t\s*wor[t\w]+\b",
+                r"\bnet\s*amount\b", r"\bn[ec]t\s*amount\b"
+            ])
         if grand_total == 0.0:
-            grand_total = find_amount([r"\bgross\s*worth\b", r"\bgross\s*amount\b"])
+            grand_total = find_amount([
+                r"\bgross\s*worth\b", r"\bgr[o0][s5ra]{1,3}\s*wor[t\w]+\b",
+                r"\bgross\s*amount\b", r"\bgr[o0][s5ra]{1,3}\s*amount\b"
+            ])
         if other_taxes == 0.0 and (cgst + sgst + igst) == 0.0:
-            other_taxes = find_amount([r"\bvat\b", r"\btax\b"])
+            other_taxes = find_amount(
+                [r"\bvat\s*(?:amt|amount|total)?\b", r"\btax\s*(?:amt|amount|total)\b", r"\bvat\b", r"\btax\s*\("],
+                exclude_patterns=tax_id_exclusions,
+                allow_int=False
+            )
+
+        # Sanity Guard: Tax can never equal or exceed Grand Total
+        if grand_total > 0.0:
+            if other_taxes >= grand_total:
+                logger.warning(f"Sanity Check: Tax ({other_taxes}) >= Grand Total ({grand_total}). Setting tax to 0.0")
+                other_taxes = 0.0
+            if (cgst + sgst + igst) >= grand_total:
+                logger.warning(f"Sanity Check: GST Taxes ({cgst + sgst + igst}) >= Grand Total ({grand_total}). Setting to 0.0")
+                cgst, sgst, igst = 0.0, 0.0, 0.0
 
         # Check for percentage tax (e.g. 10%, 18%, 5%)
         tax_rate_match = re.search(r'\b(\d{1,2}(?:\.\d{1,2})?)\s*%\b', text)
@@ -520,7 +575,7 @@ class InvoiceExtractor:
                 grand_total = calc_total
 
         if subtotal == 0.0 and grand_total > 0.0:
-            if total_tax > 0.0 or shipping > 0.0:
+            if total_tax > 0.0 and total_tax < grand_total:
                 subtotal = max(0.0, round(grand_total - total_tax + discount - shipping, 2))
             else:
                 subtotal = grand_total
@@ -529,12 +584,23 @@ class InvoiceExtractor:
             if calc_total > 0.0:
                 grand_total = calc_total
             else:
-                numbers = re.findall(amt_regex, text)
+                clean_lines = [re.sub(r'\b\d{2,4}[-\/]\d{2,4}[-\/]\d{2,6}\b', '', l) for l in lines]
+                numbers = re.findall(amt_regex, " ".join(clean_lines))
                 clean_nums = [parse_float_clean(n) for n in numbers]
                 if clean_nums:
                     grand_total = max(clean_nums)
                     if subtotal == 0.0:
                         subtotal = grand_total
+
+        # Final sanity reconciliation: ensure tax never equals grand total and subtotal is populated
+        total_tax = cgst + sgst + igst + other_taxes
+        if grand_total > 0.0 and total_tax >= grand_total:
+            other_taxes = 0.0
+            total_tax = cgst + sgst + igst
+            if total_tax >= grand_total:
+                cgst, sgst, igst, total_tax = 0.0, 0.0, 0.0, 0.0
+            if subtotal == 0.0 or subtotal >= grand_total:
+                subtotal = grand_total
 
         if bal == 0.0 and grand_total > 0.0 and paid > 0 and paid < grand_total:
             bal = max(0.0, round(grand_total - paid, 2))
